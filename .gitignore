@@ -1,0 +1,7 @@
+# Metabase binary and local application database (downloaded / created at runtime)
+metabase/
+*.jar
+*.db
+__pycache__/
+.venv/
+*.log
