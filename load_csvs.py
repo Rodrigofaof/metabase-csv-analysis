@@ -59,7 +59,9 @@ def read_csv(path: Path) -> pd.DataFrame:
 
 def parse_dates(df: pd.DataFrame) -> pd.DataFrame:
     """Converts text columns that look like dates (>=90% parseable)."""
-    for col in df.select_dtypes(include="object").columns:
+    for col in df.columns:
+        if not (pd.api.types.is_object_dtype(df[col]) or pd.api.types.is_string_dtype(df[col])):
+            continue
         sample = df[col].dropna().astype(str).head(500)
         if sample.empty or not sample.str.contains(r"\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}").mean() > 0.9:
             continue
