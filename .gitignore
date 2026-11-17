@@ -5,3 +5,6 @@ metabase/
 __pycache__/
 .venv/
 *.log
+
+# personal notes
+db_update.txt
