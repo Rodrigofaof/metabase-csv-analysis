@@ -1,0 +1,108 @@
+{
+  "metabase_version": "v0.65.4",
+  "source_database": "Interview (Postgres)",
+  "cards": [
+    {
+      "key": "card-42",
+      "name": "1. Determine the number of distinct destinations connected to the airport.",
+      "description": null,
+      "display": "scalar",
+      "type": "question",
+      "dataset_query": {
+        "database": {
+          "__database__": true
+        },
+        "lib/type": "mbql/query",
+        "stages": [
+          {
+            "native": "select Count(distinct dest) \nfrom nyc_flights_fixed \nwhere origin = 'EWR'",
+            "lib/type": "mbql.stage/native"
+          }
+        ]
+      },
+      "visualization_settings": {
+        "scalar.segments": []
+      },
+      "parameters": []
+    },
+    {
+      "key": "card-43",
+      "name": "4. Identify the month with the highest number of flights.",
+      "description": null,
+      "display": "table",
+      "type": "question",
+      "dataset_query": {
+        "database": {
+          "__database__": true
+        },
+        "lib/type": "mbql/query",
+        "stages": [
+          {
+            "native": "select date_trunc('month',Date(concat(year,'-',month,'-',day))) am, Count(*) Flights\nfrom nyc_flights_fixed \nwhere origin = 'EWR'\ngroup by 1\norder by 2 desc ",
+            "lib/type": "mbql.stage/native"
+          }
+        ]
+      },
+      "visualization_settings": {
+        "scalar.segments": [],
+        "table.pivot": false,
+        "table.pivot_column": "am",
+        "table.cell_column": "flights"
+      },
+      "parameters": []
+    },
+    {
+      "key": "card-44",
+      "name": "5. Identify the month with the highest accumulated departure delay.",
+      "description": null,
+      "display": "table",
+      "type": "question",
+      "dataset_query": {
+        "database": {
+          "__database__": true
+        },
+        "lib/type": "mbql/query",
+        "stages": [
+          {
+            "native": "Select am, total_dep_delay, sum(total_dep_delay) over(order by am ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) accumulated_total_dep_delay\nfrom (\n\tselect \tdate_trunc('month',Date(concat(year,'-',month,'-',day))) am ,\n\t\t\tsum(dep_delay) total_dep_delay\n\tfrom nyc_flights_fixed \n\twhere origin = 'EWR'\n\tand dep_time > sched_dep_time\n\tgroup by 1\n)",
+            "lib/type": "mbql.stage/native"
+          }
+        ]
+      },
+      "visualization_settings": {
+        "scalar.segments": [],
+        "table.pivot": false,
+        "table.pivot_column": "am",
+        "table.cell_column": "flights"
+      },
+      "parameters": []
+    },
+    {
+      "key": "card-45",
+      "name": "7. Create a ranking of airlines based on the number of flights they operate.",
+      "description": null,
+      "display": "table",
+      "type": "question",
+      "dataset_query": {
+        "database": {
+          "__database__": true
+        },
+        "lib/type": "mbql/query",
+        "stages": [
+          {
+            "lib/type": "mbql.stage/native",
+            "native": "Select name, flights, dense_rank() over(order by flights desc)\nfrom (\nselect nyc_airlines.name, count(*) Flights\nfrom nyc_flights_fixed \njoin nyc_airlines on nyc_flights_fixed.carrier = nyc_airlines.carrier\nwhere origin = 'EWR'\ngroup by 1\n)"
+          }
+        ]
+      },
+      "visualization_settings": {
+        "scalar.segments": [],
+        "table.pivot": false,
+        "table.pivot_column": "am",
+        "table.cell_column": "flights"
+      },
+      "parameters": []
+    }
+  ],
+  "dashboards": []
+}
