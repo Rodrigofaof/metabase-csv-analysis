@@ -85,6 +85,7 @@ filters, text cards, tabs and questions based on other questions.
 - converts column names to `snake_case` (`Order Date` → `order_date`);
 - parses date-like text columns as timestamps;
 - table name = file name in `snake_case`; existing tables are replaced.
+- `python load_csvs.py --prune` also drops tables whose CSV was removed from `data/`.
 
 ## Configuration
 

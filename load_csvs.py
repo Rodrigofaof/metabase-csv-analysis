@@ -4,6 +4,7 @@ sync, so the tables show up right away in the SQL editor.
 Usage:
     python load_csvs.py               # load everything in ./data
     python load_csvs.py path.csv      # load only the given files
+    python load_csvs.py --prune       # also DROP tables whose CSV is no longer in ./data
 
 Configuration (environment variables, defaults match docker-compose.yml):
     PG_URL    postgresql+psycopg2://postgres:metabase@localhost:5432/interview
@@ -20,7 +21,7 @@ from pathlib import Path
 
 import pandas as pd
 import requests
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 
 PG_URL = os.getenv("PG_URL", "postgresql+psycopg2://postgres:metabase@localhost:5432/interview")
 MB_URL = os.getenv("MB_URL", "http://localhost:3000")
@@ -100,11 +101,19 @@ def sync_metabase():
 
 
 def main():
-    files = [Path(p) for p in sys.argv[1:]] or sorted(DATA_DIR.glob("*.csv"))
+    args = sys.argv[1:]
+    prune = "--prune" in args
+    files = [Path(p) for p in args if p != "--prune"] or sorted(DATA_DIR.glob("*.csv"))
+    engine = create_engine(PG_URL)
+    if prune:
+        keep = {snake(p.stem) for p in DATA_DIR.glob("*.csv")}
+        with engine.begin() as con:
+            for table in inspect(con).get_table_names(schema="public"):
+                if table not in keep:
+                    con.execute(text(f'DROP TABLE public."{table}" CASCADE'))
+                    print(f"Dropped table {table} (no matching CSV in {DATA_DIR.name}/)")
     if not files:
         print(f"No CSV files found in {DATA_DIR}")
-        return
-    engine = create_engine(PG_URL)
     for path in files:
         df = read_csv(path)
         df.columns = dedupe([snake(c) for c in df.columns])
