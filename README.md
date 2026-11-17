@@ -1,123 +1,112 @@
 # CSV Analysis with Metabase
 
-Local analytics environment used for a data-analysis interview: CSV files are loaded
-into **PostgreSQL** and explored with **Metabase** (questions, charts and dashboards).
+Analysis of CSV files with **PostgreSQL** + **Metabase**. Everything is reproducible: one script
+loads the data, configures a fresh Metabase and recreates every question and dashboard.
 
 ```
-data/*.csv  ──(load_csvs.py)──►  PostgreSQL  ◄──  Metabase (http://localhost:3000)
+data/*.csv ──► PostgreSQL ◄── Metabase ◄── dashboards/metabase_export.json
+             (load_csvs.py)            (metabase_io.py import)
 ```
+
+## Reproduce the dashboards
+
+You need **Python 3.10+** and either **Docker** (option A) or a local Java + PostgreSQL (option B).
+
+### 1. Start PostgreSQL and Metabase
+
+**Option A — Docker (easiest)**
+
+```bash
+docker compose up -d
+```
+
+**Option B — without Docker**
+
+- Install [Java 21+](https://adoptium.net/) and [PostgreSQL 16](https://www.postgresql.org/download/).
+- Create the database: `CREATE DATABASE interview;` (user `postgres`, password `metabase`,
+  or point `PG_URL` at your own credentials, see [Configuration](#configuration)).
+- Download Metabase **v0.65.4** from
+  <https://downloads.metabase.com/v0.65.4/metabase.jar> into `metabase/metabase.jar`.
+- Start it: `start-metabase.bat` (Windows) or `./start-metabase.sh` (macOS/Linux).
+
+### 2. Load the data and recreate the dashboards
+
+```bash
+python -m venv .venv
+# Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
+pip install -r requirements.txt
+python metabase_io.py import
+```
+
+This single command:
+1. loads every CSV in `data/` into PostgreSQL (one table per file);
+2. waits for Metabase, creates the admin user (UI in English) and connects it to PostgreSQL;
+3. recreates all questions and dashboards from `dashboards/metabase_export.json`
+   in the **Interview Analysis** collection.
+
+### 3. Open Metabase
+
+Go to <http://localhost:3000> and log in with **`admin@example.com` / `Interview2026!`**.
+The script prints the direct link to each dashboard.
+
+---
 
 ## Repository layout
 
 | Path | Purpose |
 |------|---------|
-| `data/` | Input CSV files (`sample_sales.csv` is a small test file) |
-| `load_csvs.py` | Loads every CSV in `data/` into PostgreSQL (one table per file) |
-| `sql/` | SQL queries used for the analysis |
-| `docker-compose.yml` | PostgreSQL + Metabase in one command (recommended) |
+| `data/` | Input CSV files |
+| `dashboards/metabase_export.json` | Questions + dashboards exported from Metabase (portable, no internal ids) |
+| `sql/` | SQL queries used in the analysis |
+| `load_csvs.py` | CSV → PostgreSQL loader |
+| `metabase_io.py` | Export / import of Metabase questions and dashboards |
+| `docker-compose.yml` | PostgreSQL 16 + Metabase v0.65.4 |
 | `start-metabase.bat` / `.sh` | Run Metabase from the JAR without Docker |
-| `requirements.txt` | Python dependencies for the loader |
 
----
+## Updating the analysis (author workflow)
 
-## Option A — Docker (recommended)
-
-**Requirements:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) and Python 3.10+.
-
-```bash
-git clone <this-repo-url>
-cd <repo-folder>
-
-# 1. Start PostgreSQL + Metabase
-docker compose up -d
-
-# 2. Load the CSVs into PostgreSQL
-python -m venv .venv
-# Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
-python load_csvs.py
-```
-
-Then open <http://localhost:3000> (first start takes ~1 minute) and continue with
-[First-time Metabase setup](#first-time-metabase-setup). When adding the database, use
-**Host `postgres`** (the Docker service name).
-
-Stop everything with `docker compose down` (add `-v` to also delete the data).
-
-## Option B — Without Docker
-
-**Requirements:**
-- Java 21+ ([Eclipse Temurin](https://adoptium.net/))
-- PostgreSQL 14+ ([download](https://www.postgresql.org/download/))
-- Python 3.10+
-
-1. Create the database (user `postgres`, password `metabase`, or adjust `PG_URL` below):
-   ```sql
-   CREATE DATABASE interview;
+1. Drop new CSVs into `data/` and run `python load_csvs.py`
+   (or `python load_csvs.py data/file.csv` for a single file).
+2. Build questions and dashboards in Metabase.
+3. Export them into the repository and commit:
+   ```bash
+   python metabase_io.py export
+   git add -A && git commit -m "Update analysis" && git push
    ```
-2. Download the Metabase JAR from <https://www.metabase.com/start/oss/jar> and save it as
-   `metabase/metabase.jar`.
-3. Start Metabase:
-   - Windows: double-click `start-metabase.bat`
-   - macOS/Linux: `./start-metabase.sh`
-4. Load the CSVs (same as Option A, step 2).
 
-When adding the database in Metabase, use **Host `localhost`**.
+Only content that uses the PostgreSQL database is exported (Metabase's built-in examples are
+ignored). Questions built with the visual editor and with SQL are both supported, including
+filters, text cards, tabs and questions based on other questions.
 
----
+### How the CSV loader works
 
-## First-time Metabase setup
-
-1. Open <http://localhost:3000> and create your admin account.
-2. Add a database → **PostgreSQL**:
-
-   | Field | Value |
-   |-------|-------|
-   | Host | `postgres` (Docker) or `localhost` (no Docker) |
-   | Port | `5432` |
-   | Database name | `interview` |
-   | Username / Password | `postgres` / `metabase` |
-
-3. Tables appear under **Browse data**; use **New → SQL query** or **New → Question**
-   to build charts, and **New → Dashboard** to combine them.
-
-## Loading new CSVs
-
-Drop the files into `data/` and run:
-
-```bash
-python load_csvs.py                    # every CSV in data/
-python load_csvs.py data/orders.csv    # only specific files
-```
-
-The loader:
 - auto-detects delimiter (`,` `;` tab `|`) and encoding (UTF-8 / Latin-1);
 - converts column names to `snake_case` (`Order Date` → `order_date`);
 - parses date-like text columns as timestamps;
-- replaces the table if it already exists (table name = file name in `snake_case`).
+- table name = file name in `snake_case`; existing tables are replaced.
 
-To make the new tables appear in Metabase immediately, set your Metabase credentials and
-the loader will trigger a schema sync (otherwise use **Admin → Databases → Sync**):
+## Configuration
+
+All settings are environment variables; the defaults match `docker-compose.yml`.
+
+| Variable | Default | Used for |
+|----------|---------|----------|
+| `PG_URL` | `postgresql+psycopg2://postgres:metabase@localhost:5432/interview` | Loading CSVs |
+| `MB_URL` | `http://localhost:3000` | Metabase API |
+| `MB_USER` / `MB_PASS` | `admin@example.com` / `Interview2026!` | Metabase admin login |
+| `MB_PG_HOST` | auto (`localhost`, then `postgres`) | Host Metabase uses to reach PostgreSQL |
 
 ```bash
 # Windows PowerShell
-$env:MB_USER="you@example.com"; $env:MB_PASS="your-password"
+$env:PG_URL="postgresql+psycopg2://user:password@localhost:5432/mydb"
 # macOS/Linux
-export MB_USER=you@example.com MB_PASS=your-password
+export PG_URL=postgresql+psycopg2://user:password@localhost:5432/mydb
 ```
-
-### Configuration
-
-| Variable | Default |
-|----------|---------|
-| `PG_URL` | `postgresql+psycopg2://postgres:metabase@localhost:5432/interview` |
-| `MB_URL` | `http://localhost:3000` |
-| `MB_USER` / `MB_PASS` | empty (sync skipped) |
 
 ## Troubleshooting
 
-- **Port 5432 already in use:** a local PostgreSQL is running. Stop it, or change the
-  mapping in `docker-compose.yml` to `"5433:5432"` and set
-  `PG_URL=postgresql+psycopg2://postgres:metabase@localhost:5433/interview`.
-- **Metabase page does not load:** wait for the first start (`docker compose logs -f metabase`).
-- **Tables missing in Metabase:** Admin → Databases → your database → *Sync database schema now*.
+- **Port 5432 already in use** (a local PostgreSQL is running): stop it, or change the mapping in
+  `docker-compose.yml` to `"5433:5432"` and set `PG_URL=...@localhost:5433/interview`.
+- **Metabase takes a while to start** the first time (~1–2 min); the import script waits for it.
+- **Running the import again** archives the previous *Interview Analysis* collection and
+  recreates it, so it is safe to repeat.

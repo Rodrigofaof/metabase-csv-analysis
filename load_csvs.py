@@ -8,8 +8,8 @@ Usage:
 Configuration (environment variables, defaults match docker-compose.yml):
     PG_URL    postgresql+psycopg2://postgres:metabase@localhost:5432/interview
     MB_URL    http://localhost:3000
-    MB_USER   Metabase admin e-mail   (optional, only used for the sync step)
-    MB_PASS   Metabase admin password (optional, only used for the sync step)
+    MB_USER   admin@example.com  Metabase admin login (only used for the sync step)
+    MB_PASS   Interview2026!
 """
 import csv
 import os
@@ -24,8 +24,8 @@ from sqlalchemy import create_engine
 
 PG_URL = os.getenv("PG_URL", "postgresql+psycopg2://postgres:metabase@localhost:5432/interview")
 MB_URL = os.getenv("MB_URL", "http://localhost:3000")
-MB_USER = os.getenv("MB_USER", "")
-MB_PASS = os.getenv("MB_PASS", "")
+MB_USER = os.getenv("MB_USER", "admin@example.com")
+MB_PASS = os.getenv("MB_PASS", "Interview2026!")
 
 DATA_DIR = Path(__file__).parent / "data"
 
