@@ -271,17 +271,21 @@ def connect_postgres(mb):
             print(f"Using existing Metabase database '{d['name']}'")
             mb.post(f"/database/{d['id']}/sync_schema")
             return d["id"]
-    hosts = [os.getenv("MB_PG_HOST")] if os.getenv("MB_PG_HOST") else [PG.host, "postgres", "host.docker.internal"]
+    port = PG.port or 5432
+    if os.getenv("MB_PG_HOST"):
+        candidates = [(os.getenv("MB_PG_HOST"), port)]
+    else:  # Metabase on this machine, Metabase in docker-compose (internal port), Docker host
+        candidates = [(PG.host, port), ("postgres", 5432), ("host.docker.internal", port)]
     errors = []
-    for host in dict.fromkeys(hosts):
+    for host, p in dict.fromkeys(candidates):
         try:
             d = mb.post("/database", {"engine": "postgres", "name": DB_NAME, "details": {
-                "host": host, "port": PG.port or 5432, "dbname": PG.database,
+                "host": host, "port": p, "dbname": PG.database,
                 "user": PG.username, "password": PG.password, "ssl": False}})
-            print(f"Connected Metabase to PostgreSQL at {host}:{PG.port or 5432}/{PG.database}")
+            print(f"Connected Metabase to PostgreSQL at {host}:{p}/{PG.database}")
             return d["id"]
         except RuntimeError as e:
-            errors.append(f"{host}: {e}")
+            errors.append(f"{host}:{p}: {e}")
     sys.exit("Metabase could not connect to PostgreSQL:\n  " + "\n  ".join(errors))
 
 
@@ -320,9 +324,11 @@ def needed_tables(obj):
 
 
 def import_(args):
-    if not EXPORT_FILE.exists():
-        sys.exit(f"{EXPORT_FILE} not found. Run `python metabase_io.py export` on the source Metabase first.")
-    data = json.loads(EXPORT_FILE.read_text(encoding="utf-8"))
+    if EXPORT_FILE.exists():
+        data = json.loads(EXPORT_FILE.read_text(encoding="utf-8"))
+    else:
+        print(f"(Note) {EXPORT_FILE.name} not found: setting up data and Metabase only, no dashboards.")
+        data = {"metabase_version": None, "cards": [], "dashboards": []}
 
     if not args.skip_load:
         print("== Loading CSVs into PostgreSQL")
@@ -333,13 +339,18 @@ def import_(args):
     print("== Configuring Metabase")
     mb = Metabase()
     mb.wait_until_up()
-    if mb.version() != data["metabase_version"]:
+    if data["metabase_version"] and mb.version() != data["metabase_version"]:
         print(f"(Warning) export made with Metabase {data['metabase_version']}, this is {mb.version()}")
     setup_or_login(mb)
     db_id = connect_postgres(mb)
-    tables, fields = wait_for_tables(mb, db_id, needed_tables(data))
+    csv_tables = {f"public.{load_csvs.snake(p.stem)}" for p in load_csvs.DATA_DIR.glob("*.csv")}
+    tables, fields = wait_for_tables(mb, db_id, needed_tables(data) | csv_tables)
     tables = {v: k for k, v in tables.items()}
     fields = {v: k for k, v in fields.items()}
+
+    if not data["cards"] and not data["dashboards"]:
+        print(f"\nDone. Open {MB_URL} and log in as {MB_USER} / {MB_PASS}")
+        return
 
     # fresh collection on every run, previous one is archived
     for c in mb.get("/collection"):

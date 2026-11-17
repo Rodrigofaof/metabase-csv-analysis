@@ -26,7 +26,7 @@ docker compose up -d
 - Create the database: `CREATE DATABASE interview;` (user `postgres`, password `metabase`,
   or point `PG_URL` at your own credentials, see [Configuration](#configuration)).
 - Download Metabase **v0.65.4** from
-  <https://downloads.metabase.com/v0.65.4/metabase.jar> into `metabase/metabase.jar`.
+  [https://downloads.metabase.com/v0.65.4/metabase.jar](https://downloads.metabase.com/v0.65.4/metabase.jar) into `metabase/metabase.jar`.
 - Start it: `start-metabase.bat` (Windows) or `./start-metabase.sh` (macOS/Linux).
 
 ### 2. Load the data and recreate the dashboards
@@ -39,6 +39,7 @@ python metabase_io.py import
 ```
 
 This single command:
+
 1. loads every CSV in `data/` into PostgreSQL (one table per file);
 2. waits for Metabase, creates the admin user (UI in English) and connects it to PostgreSQL;
 3. recreates all questions and dashboards from `dashboards/metabase_export.json`
@@ -46,22 +47,22 @@ This single command:
 
 ### 3. Open Metabase
 
-Go to <http://localhost:3000> and log in with **`admin@example.com` / `Interview2026!`**.
+Go to [http://localhost:3000](http://localhost:3000) and log in with **`admin@example.com` / `Interview2026!`**.
 The script prints the direct link to each dashboard.
 
 ---
 
 ## Repository layout
 
-| Path | Purpose |
-|------|---------|
-| `data/` | Input CSV files |
+| Path                                | Purpose                                                                   |
+| ----------------------------------- | ------------------------------------------------------------------------- |
+| `data/`                           | Input CSV files                                                           |
 | `dashboards/metabase_export.json` | Questions + dashboards exported from Metabase (portable, no internal ids) |
-| `sql/` | SQL queries used in the analysis |
-| `load_csvs.py` | CSV → PostgreSQL loader |
-| `metabase_io.py` | Export / import of Metabase questions and dashboards |
-| `docker-compose.yml` | PostgreSQL 16 + Metabase v0.65.4 |
-| `start-metabase.bat` / `.sh` | Run Metabase from the JAR without Docker |
+| `sql/`                            | SQL queries used in the analysis                                          |
+| `load_csvs.py`                    | CSV → PostgreSQL loader                                                  |
+| `metabase_io.py`                  | Export / import of Metabase questions and dashboards                      |
+| `docker-compose.yml`              | PostgreSQL 16 + Metabase v0.65.4                                          |
+| `start-metabase.bat` / `.sh`    | Run Metabase from the JAR without Docker                                  |
 
 ## Updating the analysis (author workflow)
 
@@ -89,12 +90,12 @@ filters, text cards, tabs and questions based on other questions.
 
 All settings are environment variables; the defaults match `docker-compose.yml`.
 
-| Variable | Default | Used for |
-|----------|---------|----------|
-| `PG_URL` | `postgresql+psycopg2://postgres:metabase@localhost:5432/interview` | Loading CSVs |
-| `MB_URL` | `http://localhost:3000` | Metabase API |
-| `MB_USER` / `MB_PASS` | `admin@example.com` / `Interview2026!` | Metabase admin login |
-| `MB_PG_HOST` | auto (`localhost`, then `postgres`) | Host Metabase uses to reach PostgreSQL |
+| Variable                  | Default                                                              | Used for                               |
+| ------------------------- | -------------------------------------------------------------------- | -------------------------------------- |
+| `PG_URL`                | `postgresql+psycopg2://postgres:metabase@localhost:5432/interview` | Loading CSVs                           |
+| `MB_URL`                | `http://localhost:3000`                                            | Metabase API                           |
+| `MB_USER` / `MB_PASS` | `admin@example.com` / `Interview2026!`                           | Metabase admin login                   |
+| `MB_PG_HOST`            | auto (`localhost`, then `postgres`)                              | Host Metabase uses to reach PostgreSQL |
 
 ```bash
 # Windows PowerShell
@@ -105,8 +106,22 @@ export PG_URL=postgresql+psycopg2://user:password@localhost:5432/mydb
 
 ## Troubleshooting
 
-- **Port 5432 already in use** (a local PostgreSQL is running): stop it, or change the mapping in
-  `docker-compose.yml` to `"5433:5432"` and set `PG_URL=...@localhost:5433/interview`.
+- **Port 5432 already in use** (a local PostgreSQL is running): start Docker's PostgreSQL on
+  another port and point the scripts at it:
+  ```powershell
+  # Windows PowerShell
+  $env:PG_PORT="5433"; docker compose up -d
+  $env:PG_URL="postgresql+psycopg2://postgres:metabase@localhost:5433/interview"
+  python metabase_io.py import
+  ```
+  ```bash
+  # macOS/Linux
+  PG_PORT=5433 docker compose up -d
+  export PG_URL=postgresql+psycopg2://postgres:metabase@localhost:5433/interview
+  python metabase_io.py import
+  ```
+- **No `dashboards/metabase_export.json` yet:** `import` still loads the data and configures
+  Metabase; only the dashboard step is skipped.
 - **Metabase takes a while to start** the first time (~1–2 min); the import script waits for it.
 - **Running the import again** archives the previous *Interview Analysis* collection and
   recreates it, so it is safe to repeat.
