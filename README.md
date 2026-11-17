@@ -108,6 +108,7 @@ export PG_URL=postgresql+psycopg2://user:password@localhost:5432/mydb
 
 - **Port 5432 already in use** (a local PostgreSQL is running): start Docker's PostgreSQL on
   another port and point the scripts at it:
+
   ```powershell
   # Windows PowerShell
   $env:PG_PORT="5433"; docker compose up -d
